@@ -27,8 +27,49 @@ class _GroceryListState extends State<GroceryList> {
     });
   }
 
+  void _removeItem(GroceryItem item) {
+    setState(() {
+      _groceryItems.remove(item);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    Widget content = const Center(
+      child: Text(
+        'There is no item added.',
+      ),
+    );
+
+    if (_groceryItems.isNotEmpty) {
+      content = ListView.builder(
+        itemCount: _groceryItems.length,
+        itemBuilder: (context, index) => Dismissible(
+          key: ValueKey(
+            _groceryItems[index].id,
+          ),
+          onDismissed: (direction) {
+            _removeItem(_groceryItems[index]);
+          },
+          child: ListTile(
+            leading: Container(
+              color: _groceryItems[index].category.color,
+              width: 24,
+              height: 24,
+            ),
+            title: Text(
+              _groceryItems[index].name,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            trailing: Text(
+              _groceryItems[index].quantity.toString(),
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -43,24 +84,7 @@ class _GroceryListState extends State<GroceryList> {
           ),
         ],
       ),
-      body: ListView.builder(
-        itemCount: _groceryItems.length,
-        itemBuilder: (context, index) => ListTile(
-          leading: Container(
-            color: _groceryItems[index].category.color,
-            width: 24,
-            height: 24,
-          ),
-          title: Text(
-            _groceryItems[index].name,
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          trailing: Text(
-            _groceryItems[index].quantity.toString(),
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-        ),
-      ),
+      body: content,
     );
   }
 }
