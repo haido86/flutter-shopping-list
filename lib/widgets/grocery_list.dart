@@ -1,10 +1,9 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+
 import 'package:shopping_list/data/categories.dart';
 import 'package:shopping_list/models/category.dart';
-
 import 'package:shopping_list/models/grocery_item.dart';
 import 'package:shopping_list/widgets/new_item.dart';
 
@@ -19,12 +18,17 @@ class _GroceryListState extends State<GroceryList> {
   var _isLoading = true;
   String? _error;
 
+  // Key for the Scaffold to show SnackBars.
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   @override
   void initState() {
     super.initState();
+    // Load grocery items when the widget is initialized.
     _loadItems();
   }
 
+  // Loads grocery items from the server and updates the UI.
   void _loadItems() async {
     final url = Uri.https(
       'flutter-app-d9fb0-default-rtdb.firebaseio.com',
@@ -33,6 +37,7 @@ class _GroceryListState extends State<GroceryList> {
     final response = await http.get(url);
 
     if (response.statusCode >= 400) {
+      // Handle errors and set the error message.
       setState(() {
         _error = 'Fail to fetch data. Please try again.';
       });
@@ -41,6 +46,7 @@ class _GroceryListState extends State<GroceryList> {
     final List<GroceryItem> loadedItems = [];
     final Map<String, dynamic> listData = json.decode(response.body);
     for (final item in listData.entries) {
+      // Map server data to GroceryItem objects.
       final Category category = categories.entries
           .firstWhere((cat) => cat.value.name == item.value['category'])
           .value;
@@ -50,12 +56,14 @@ class _GroceryListState extends State<GroceryList> {
           quantity: item.value['quantity'],
           category: category));
     }
+
     setState(() {
       _groceryItems = loadedItems;
       _isLoading = false;
     });
   }
 
+  // Adds a new grocery item to the list.
   void _addItem() async {
     final newItem = await Navigator.of(context).push<GroceryItem>(
       MaterialPageRoute(
@@ -71,10 +79,39 @@ class _GroceryListState extends State<GroceryList> {
     });
   }
 
-  void _removeItem(GroceryItem item) {
+  // Removes a grocery item from the list and handles errors.
+  void _removeItem(GroceryItem item) async {
+    ScaffoldMessengerState scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    final index = _groceryItems.indexOf(item);
+    final itemName = item.name;
     setState(() {
       _groceryItems.remove(item);
     });
+    final url = Uri.https(
+      'flutter-app-d9fb0-default-rtdb.firebaseio.com',
+      'shopping-list/${item.id}.json',
+    );
+    final response = await http.delete(url);
+
+    if (response.statusCode >= 400) {
+      setState(() {
+        // Handle the error and reinsert the item.
+        _groceryItems.insert(index, item);
+      });
+      // Show the SnackBar using ScaffoldMessenger.
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('$itemName can\'t be removed.'),
+        ),
+      );
+    } else {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('$itemName is removed.'),
+        ),
+      );
+    }
   }
 
   @override
@@ -127,6 +164,7 @@ class _GroceryListState extends State<GroceryList> {
     }
 
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: const Text(
           'Your groceries',
