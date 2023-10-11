@@ -34,40 +34,44 @@ class _GroceryListState extends State<GroceryList> {
       'flutter-app-d9fb0-default-rtdb.firebaseio.com',
       'shopping-list.json',
     );
-    final response = await http.get(url);
 
-    if (response.statusCode >= 400) {
-      // Handle errors and set the error message.
-      setState(() {
-        _error = 'Fail to fetch data. Please try again.';
-      });
-    }
+    try {
+      final response = await http.get(url);
+      if (response.statusCode >= 400) {
+        // Handle errors and set the error message.
+        setState(() {
+          _error = 'Fail to fetch data. Please try again.';
+        });
+      }
+      if (response.body == 'null') {
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
 
-    if (response.body == 'null') {
+      final List<GroceryItem> loadedItems = [];
+      final Map<String, dynamic> listData = json.decode(response.body);
+      for (final item in listData.entries) {
+        // Map server data to GroceryItem objects.
+        final Category category = categories.entries
+            .firstWhere((cat) => cat.value.name == item.value['category'])
+            .value;
+        loadedItems.add(GroceryItem(
+            id: item.key,
+            name: item.value['name'],
+            quantity: item.value['quantity'],
+            category: category));
+      }
       setState(() {
+        _groceryItems = loadedItems;
         _isLoading = false;
       });
-      return;
+    } catch (error) {
+      setState(() {
+        _error = 'Something went wrong. Please try again.';
+      });
     }
-
-    final List<GroceryItem> loadedItems = [];
-    final Map<String, dynamic> listData = json.decode(response.body);
-    for (final item in listData.entries) {
-      // Map server data to GroceryItem objects.
-      final Category category = categories.entries
-          .firstWhere((cat) => cat.value.name == item.value['category'])
-          .value;
-      loadedItems.add(GroceryItem(
-          id: item.key,
-          name: item.value['name'],
-          quantity: item.value['quantity'],
-          category: category));
-    }
-
-    setState(() {
-      _groceryItems = loadedItems;
-      _isLoading = false;
-    });
   }
 
   // Adds a new grocery item to the list.
@@ -77,7 +81,6 @@ class _GroceryListState extends State<GroceryList> {
         builder: (context) => const NewItem(),
       ),
     );
-
     if (newItem == null) {
       return;
     }
@@ -86,38 +89,39 @@ class _GroceryListState extends State<GroceryList> {
     });
   }
 
+  void showInfoMessage(String message) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+    ));
+  }
+
   // Removes a grocery item from the list and handles errors.
   void _removeItem(GroceryItem item) async {
-    ScaffoldMessengerState scaffoldMessenger = ScaffoldMessenger.of(context);
-
     final index = _groceryItems.indexOf(item);
     final itemName = item.name;
     setState(() {
       _groceryItems.remove(item);
     });
     final url = Uri.https(
-      'flutter-app-d9fb0-default-rtdb.firebaseio.com',
+      'aflutter-app-d9fb0-default-rtdb.firebaseio.com',
       'shopping-list/${item.id}.json',
     );
-    final response = await http.delete(url);
-
-    if (response.statusCode >= 400) {
+    try {
+      final response = await http.delete(url);
+      if (response.statusCode >= 400) {
+        setState(() {
+          // Handle the error and reinsert the item.
+          _groceryItems.insert(index, item);
+        });
+        showInfoMessage('$itemName can\'t be removed.');
+      } else {
+        showInfoMessage('$itemName was removed.');
+      }
+    } catch (error) {
       setState(() {
-        // Handle the error and reinsert the item.
-        _groceryItems.insert(index, item);
+        _error = 'Something went wrong! Please try again later.';
       });
-      // Show the SnackBar using ScaffoldMessenger.
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('$itemName can\'t be removed.'),
-        ),
-      );
-    } else {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('$itemName is removed.'),
-        ),
-      );
     }
   }
 
@@ -163,7 +167,6 @@ class _GroceryListState extends State<GroceryList> {
         ),
       );
     }
-
     if (_error != null) {
       content = Center(
         child: Text(_error!),
